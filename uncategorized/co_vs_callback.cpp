@@ -13,7 +13,7 @@
 // clang++ -std=c++2a -fcoroutines-ts -lstdc++ co_vs_callback.cpp
 
 using call_back = std::function<void(int)>;
-void Add100ByCallback(int init, call_back f)
+void Add100ByCallback(int init, call_back f) // 异步调用
 {
 	std::thread t([init, f]() {
 		std::this_thread::sleep_for(std::chrono::seconds(5));
@@ -33,7 +33,7 @@ struct Add00AWaitable
 			result_ = value;
 			handle.resume();
 		};
-		Add100ByCallback(init_, f);
+		Add100ByCallback(init_, f); // 调用原来的异步调用
 	}
 	int init_;
 	int result_;
