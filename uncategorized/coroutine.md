@@ -104,6 +104,8 @@ struct Add00AWaitable
 Add100ByCoroutine(10, [](int value){ std::cout<<"get result from coroutine: "<<value<<"\n"; });
 ```
 
-按照这个思路，可以将任意异步调用改造成协程，并且重用原来的回调函数。比如本文提到的例子中重用了Add100ByCallback函数。
+按照这个思路，可以将任意异步调用轻松改造成协程，比如上面的例子是将原本的Add100ByCallback函数改成了协程。
 
 按照例子依葫芦画瓢，然后再结合网上那些似懂非懂的文档，各位c++er都可以入门了。但是C++协程的知识非常之多，如何实在需要的时候提供15个函数中的其它函数、如何高效、如何避免不必要的加锁，可以说是高手发挥的舞台。关于协程的进一步学习可以看[这里（共有3篇）](https://lewissbaker.github.io/)。
+
+附[本文例子源码](https://github.com/franktea/temp/blob/master/uncategorized/co_vs_callback.cpp)。

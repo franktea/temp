@@ -9,7 +9,6 @@
 #include <experimental/coroutine>
 #include <chrono>
 #include <functional>
-#include <boost/type_index.hpp>
 
 // clang++ -std=c++2a -fcoroutines-ts -lstdc++ co_vs_callback.cpp
 
