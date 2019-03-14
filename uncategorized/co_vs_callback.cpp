@@ -22,9 +22,9 @@ void Add100ByCallback(int init, call_back f) // 异步调用
 	t.detach();
 }
 
-struct Add00AWaitable
+struct Add100AWaitable
 {
-	Add00AWaitable(int init):init_(init) {}
+	Add100AWaitable(int init):init_(init) {}
 	bool await_ready() const { return false; }
 	int await_resume() { return result_; }
 	void await_suspend(std::experimental::coroutine_handle<> handle)
@@ -52,7 +52,7 @@ struct Task
 
 Task Add100ByCoroutine(int init, call_back f)
 {
-	int ret = co_await Add00AWaitable(init);
+	int ret = co_await Add100AWaitable(init);
 	f(ret);
 }
 
