@@ -53,13 +53,18 @@ struct Task
 Task Add100ByCoroutine(int init, call_back f)
 {
 	int ret = co_await Add100AWaitable(init);
+	ret = co_await Add100AWaitable(ret);
+	ret = co_await Add100AWaitable(ret);
 	f(ret);
 }
 
 int main()
 {
 	Add100ByCallback(5, [](int value){ std::cout<<"get result: "<<value<<"\n"; });
-	Add100ByCoroutine(10, [](int value){ std::cout<<"get result from coroutine: "<<value<<"\n"; });
+	Add100ByCoroutine(10, [](int value){ std::cout<<"get result from coroutine1: "<<value<<"\n"; });
+	Add100ByCoroutine(20, [](int value){ std::cout<<"get result from coroutine2: "<<value<<"\n"; });
+	Add100ByCoroutine(30, [](int value){ std::cout<<"get result from coroutine3: "<<value<<"\n"; });
+	Add100ByCoroutine(40, [](int value){ std::cout<<"get result from coroutine4: "<<value<<"\n"; });
 	getchar();
 }
 
