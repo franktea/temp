@@ -153,9 +153,9 @@ Task HelloCoroutine(GreeterClient& greeter)
 {
     for (int i = 0; i < 100; i++) {
         std::string user("world " + std::to_string(i));
-        std::cout<<"send request: "<<user<<std::endl;
+        std::cout<<"send request==>: "<<user<<std::endl;
         auto* call = greeter.SayHello(user);  // The actual RPC call!
-        Status status = co_await (*call);
+        Status status = co_await *call;
 
         if (call->status.ok())
             std::cout << "Greeter received: " << call->reply.message() << std::endl;
