@@ -73,7 +73,7 @@ class GreeterClient {
         call->response_reader->Finish(&call->reply, &call->status, (void*)call);
 
         boost::fibers::future<AsyncClientCall*> future(call->promise.get_future());
-        return future.get();
+        return future.get(); // yield current coroutine , wait for result.
     }
 
     // Loop while listening for completed responses.
