@@ -149,22 +149,19 @@ struct Task
 	};
 };
 
-Task HelloCoroutine(GreeterClient& greeter)
+Task HelloCoroutine(GreeterClient& greeter, std::string user)
 {
-    for (int i = 0; i < 100; i++) {
-        std::string user("world " + std::to_string(i));
-        std::cout<<"send request==>: "<<user<<std::endl;
-        auto* call = greeter.SayHello(user);  // The actual RPC call!
-        Status status = co_await *call;
+	std::cout<<"send request==>: "<<user<<std::endl;
+	auto* call = greeter.SayHello(user);  // The actual RPC call!
+	Status status = co_await *call;
 
-        if (call->status.ok())
-            std::cout << "Greeter received: " << call->reply.message() << std::endl;
-        else
-            std::cout << "RPC failed" << std::endl;
+	if (call->status.ok())
+		std::cout << "Greeter received: " << call->reply.message() << std::endl;
+	else
+		std::cout << "RPC failed" << std::endl;
 
-        // Once we're complete, deallocate the call object.
-        delete call;
-    }
+	// Once we're complete, deallocate the call object.
+	delete call;
 }
 
 int main(int argc, char** argv) {
@@ -180,7 +177,10 @@ int main(int argc, char** argv) {
     // Spawn reader thread that loops indefinitely
     std::thread thread_ = std::thread(&GreeterClient::AsyncCompleteRpc, &greeter);
 
-    HelloCoroutine(greeter);
+    for (int i = 0; i < 100; i++) { // 开100个协程
+        std::string user("world " + std::to_string(i));
+        HelloCoroutine(greeter, user);
+    }
 
     std::cout << "Press control-c to quit" << std::endl << std::endl;
     thread_.join();  //blocks forever
