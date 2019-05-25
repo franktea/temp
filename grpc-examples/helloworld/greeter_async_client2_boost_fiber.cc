@@ -157,11 +157,16 @@ int main(int argc, char** argv) {
         	SendAndRecv(greeter, user);
         });
         fb.detach();
-
-        boost::this_fiber::yield();
     }
 
     std::cout << "Press control-c to quit" << std::endl << std::endl;
+
+    while(1)
+    {
+    	boost::this_fiber::yield();
+    	boost::this_fiber::sleep_for(std::chrono::milliseconds(5));
+    }
+
     thread_.join();  //blocks forever
 
     return 0;
