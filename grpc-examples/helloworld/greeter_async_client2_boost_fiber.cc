@@ -153,10 +153,12 @@ int main(int argc, char** argv) {
 
     for (int i = 0; i < 100; i++) { // start 100 coroutines
         std::string user("world " + std::to_string(i));
-        boost::fibers::fiber fb(boost::fibers::launch::dispatch, [&greeter, user](){
+        boost::fibers::fiber fb([&greeter, user](){
         	SendAndRecv(greeter, user);
         });
         fb.detach();
+
+        boost::this_fiber::yield();
     }
 
     std::cout << "Press control-c to quit" << std::endl << std::endl;
