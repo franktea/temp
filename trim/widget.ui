@@ -7,25 +7,12 @@
     <x>0</x>
     <y>0</y>
     <width>826</width>
-    <height>543</height>
+    <height>551</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Widget</string>
   </property>
-  <widget class="QPushButton" name="trim">
-   <property name="geometry">
-    <rect>
-     <x>370</x>
-     <y>500</y>
-     <width>100</width>
-     <height>32</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>trim</string>
-   </property>
-  </widget>
   <widget class="QPlainTextEdit" name="plainTextEdit">
    <property name="geometry">
     <rect>
@@ -36,26 +23,13 @@
     </rect>
    </property>
   </widget>
-  <widget class="QPushButton" name="copy">
-   <property name="geometry">
-    <rect>
-     <x>490</x>
-     <y>500</y>
-     <width>100</width>
-     <height>32</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>copy</string>
-   </property>
-  </widget>
   <widget class="QPushButton" name="paste">
    <property name="geometry">
     <rect>
-     <x>240</x>
+     <x>280</x>
      <y>500</y>
-     <width>100</width>
-     <height>32</height>
+     <width>261</width>
+     <height>51</height>
     </rect>
    </property>
    <property name="text">

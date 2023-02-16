@@ -10,13 +10,8 @@ Widget::Widget(QWidget *parent)
     QObject::connect(ui->paste, &QPushButton::clicked, [this](){
         QClipboard *clipboard = QGuiApplication::clipboard();
         ui->plainTextEdit->setPlainText(clipboard->text());
-    });
-    QObject::connect(ui->trim, &QPushButton::clicked, [this](){
         qDebug() << ui->plainTextEdit->toPlainText() << "\n";
         ui->plainTextEdit->setPlainText(ui->plainTextEdit->toPlainText().replace("//", "").replace("\n", " "));
-    });
-    QObject::connect(ui->copy, &QPushButton::clicked, [this](){
-        QClipboard *clipboard = QGuiApplication::clipboard();
         clipboard->setText(ui->plainTextEdit->toPlainText());
     });
 }
