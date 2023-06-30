@@ -16,6 +16,12 @@
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
     <widget class="QLabel" name="label">
+     <property name="font">
+      <font>
+       <family>Academy Engraved LET</family>
+       <pointsize>64</pointsize>
+      </font>
+     </property>
      <property name="text">
       <string>Exit In:</string>
      </property>

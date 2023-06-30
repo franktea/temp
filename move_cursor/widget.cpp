@@ -1,7 +1,8 @@
 #include <QCursor>
 #include <QTime>
 #include <QTimer>
-#include <QDesktopWidget>
+#include <QScreen>
+#include <QApplication>
 #include "widget.h"
 #include "ui_widget.h"
 
@@ -13,7 +14,8 @@ Widget::Widget(QWidget *parent) :
 
     seconds_ = 10;
 
-    QRect rec = QApplication::desktop()->screenGeometry();
+    QScreen* screen = QApplication::primaryScreen();
+    QRect rec = screen->geometry();
     int h = rec.height() / 2;
     int w = rec.width() / 2;
 
@@ -37,7 +39,7 @@ Widget::~Widget()
 
 void Widget::showTime()
 {
-    QString text = QString::number(seconds_) + QString("  s");
+    QString text = QString::number(seconds_);
 /*
     QTime time = QTime::currentTime();
     QString text = time.toString("hh:mm");
