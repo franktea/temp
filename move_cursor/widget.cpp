@@ -15,14 +15,15 @@ Widget::Widget(QWidget *parent) :
     seconds_ = 10;
 
     QScreen* screen = QApplication::primaryScreen();
-    QRect rec = screen->geometry();
+    QRect rec = screen->availableGeometry();
+    qDebug() << "Cursor pos: " << QCursor::pos();
     int h = rec.height() / 2;
     int w = rec.width() / 2;
 
-    QCursor c = cursor();
-    c.setPos(QPoint(w, h));
-    //c.setShape(Qt::BlankCursor);
-    setCursor(c);
+    qDebug() << "w = "<<w<<", h= "<<h;
+
+    QPointF p = mapToGlobal(QPointF(w, h));
+    QCursor::setPos(p.x(), p.y());
 
     QTimer *timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(showTime()));
@@ -40,13 +41,8 @@ Widget::~Widget()
 void Widget::showTime()
 {
     QString text = QString::number(seconds_);
-/*
-    QTime time = QTime::currentTime();
-    QString text = time.toString("hh:mm");
-    if ((time.second() % 2) == 0)
-        text[2] = ' ';
-*/
-    ui->lcdNumber->display(text);
+    text = QString("Exit in ") + text + " seconds";
+    ui->label->setText(text);
 
     if(seconds_ <= 0)
     {

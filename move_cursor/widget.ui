@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
-    <height>300</height>
+    <width>639</width>
+    <height>100</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -18,7 +18,7 @@
     <widget class="QLabel" name="label">
      <property name="font">
       <font>
-       <family>Academy Engraved LET</family>
+       <family>Courier New</family>
        <pointsize>64</pointsize>
       </font>
      </property>
@@ -26,9 +26,6 @@
       <string>Exit In:</string>
      </property>
     </widget>
-   </item>
-   <item>
-    <widget class="QLCDNumber" name="lcdNumber"/>
    </item>
   </layout>
  </widget>
