@@ -34,19 +34,28 @@ Widget::Widget(QWidget *parent)
 
     delete[] displays;
 
-    QTimer* timer = new QTimer;
-    timer->setInterval(5000);
-    timer->setSingleShot(true);
-    QObject::connect(timer, &QTimer::timeout, [timer](){
-        delete timer;
-        QApplication::quit();
-    });
-    timer->start();
-
     label = new QLabel(this);
+    QFont font = label->font();
+    font.setPointSize(50);
+    label->setFont(font);
     label->setFrameStyle(QFrame::Panel | QFrame::Sunken);
     label->setText("exit after 5 seconds");
     label->setAlignment(Qt::AlignBottom | Qt::AlignRight);
+
+    QTimer* timer = new QTimer;
+    timer->setInterval(1000);
+    QObject::connect(timer, &QTimer::timeout, [label=this->label, timer](){
+        static int i = 1;
+        if(i >= 5) {
+            delete timer;
+            QApplication::quit();
+        } else {
+            QString str = QString("Exit after %d seconds").arg(i);
+            label->setText(str);
+            ++ i;
+        }
+    });
+    timer->start();
 }
 
 Widget::~Widget()

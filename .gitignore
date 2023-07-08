@@ -3,3 +3,6 @@
 /build-trim-desktop-Debug/
 /build-trim-Desktop-Debug/
 /build-move_cursor-Desktop-Debug/
+/build-mac_cursor_center_qt-Desktop-Debug/
+/build-mac_cursor_center_qt-Desktop-Release/
+*.txt.user
