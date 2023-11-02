@@ -1,8 +1,5 @@
-/build-trim-Desktop_x86_darwin_generic_mach_o_64bit-Debug/
 /.DS_Store
-/build-trim-desktop-Debug/
-/build-trim-Desktop-Debug/
-/build-move_cursor-Desktop-Debug/
-/build-mac_cursor_center_qt-Desktop-Debug/
-/build-mac_cursor_center_qt-Desktop-Release/
+/build-*
 *.txt.user
+build
+.vscode
