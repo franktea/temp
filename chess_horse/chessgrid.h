@@ -98,7 +98,7 @@ private:
     int NextIndex(StackItem& si)
     {
         int ret = -1;
-        int max_way = 100;
+        //int max_way = 100;
         static int arr[] = {0, 1, 2, 3, 4, 5, 6, 7};
         std::random_device rd;
         std::mt19937 g(rd());

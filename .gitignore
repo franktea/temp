@@ -3,3 +3,4 @@
 *.txt.user
 build
 .vscode
+*.pro.user
