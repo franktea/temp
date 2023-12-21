@@ -4,3 +4,5 @@
 build
 .vscode
 *.pro.user
+asio_composed_operation/client
+asio_composed_operation/server
