@@ -6,3 +6,5 @@ build
 *.pro.user
 asio_composed_operation/client
 asio_composed_operation/server
+rand_bmp/a.out
+rand_bmp/random.bmp
