@@ -1,0 +1,17 @@
+#include <boost/preprocessor.hpp>
+
+
+#define DECLARE_DATA_MEMBER(R,TYPES,INDEX,NAME) BOOST_PP_SEQ_ELEM(INDEX,TYPES) BOOST_PP_CAT(m_,NAME);
+
+#define DEFINE_ACCESSOR(R,TYPES,INDEX,NAME) BOOST_PP_SEQ_ELEM(INDEX,TYPES) NAME(){ return BOOST_PP_CAT(m_,NAME); }
+
+#define MY_MACRO(TYPES,NAMES) \
+BOOST_PP_SEQ_FOR_EACH_I(DECLARE_DATA_MEMBER,TYPES,NAMES) \
+public: \
+BOOST_PP_SEQ_FOR_EACH_I(DEFINE_ACCESSOR,TYPES,NAMES)
+
+//two different sequences
+struct A
+{
+    MY_MACRO((int)(float)(double),(x)(y)(z))
+};
