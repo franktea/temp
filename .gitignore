@@ -1,4 +1,4 @@
-/.DS_Store
+.DS_Store
 /build-*
 *.txt.user
 build
@@ -9,3 +9,4 @@ asio_composed_operation/server
 rand_bmp/a.out
 rand_bmp/random.bmp
 */a.out
+build-*-Debug
