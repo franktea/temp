@@ -20,7 +20,9 @@ public:
     explicit TimerAwaitable(std::chrono::milliseconds t) : t_(t) {}
 
     ~TimerAwaitable() {
-
+        if(connection_) {
+            QObject::disconnect(connection_);
+        }
     }
 
     bool await_ready() noexcept {
