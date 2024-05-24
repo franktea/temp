@@ -13,8 +13,10 @@
 
 namespace QtSteExec {
 
+using namespace stdexec::tags;
+
 template <class Recv>
-class QThreadOperationState;
+class QThreadOperation;
 
 
 class QThreadScheduler {
@@ -25,7 +27,7 @@ public:
     struct default_env {
         QThread* thread;
         template<typename CPO>
-            friend QThreadScheduler tag_invoke(stdexec::get_completion_scheduler_t<CPO>,
+        friend QThreadScheduler tag_invoke(stdexec::get_completion_scheduler_t<CPO>,
                                            default_env env) noexcept {
             return QThreadScheduler(env.thread);
         }
@@ -45,8 +47,8 @@ public:
         }
 
         template<class Recv>
-        friend inline QThreadOperationState<Recv> tag_invoke(stdexec::connect_t, QThreadSender sender, Recv&& receiver) {
-            return QThreadOperationState<Recv>(std::move(receiver), sender.thread_);
+        auto connect(Recv receiver) {
+            return QThreadOperation<Recv>(std::move(receiver), thread_);
         }
 
         friend QThreadSender tag_invoke(stdexec::schedule_t, QThreadScheduler sched) {
@@ -70,9 +72,9 @@ inline QThreadScheduler QThreadAdScheduler(QThread& thread) {
 }
 
 template<class Recv>
-class QThreadOperationState {
+class QThreadOperation {
 public:
-    QThreadOperationState(Recv&& receiver, QThread* thread):
+    QThreadOperation(Recv&& receiver, QThread* thread):
         receiver_(std::move(receiver)),
         thread_(thread) {}
 
@@ -81,12 +83,8 @@ public:
             [this]() { stdexec::set_value(std::move(receiver_)); },
             Qt::QueuedConnection);
     }
-
-    friend void tag_invoke(stdexec::tag_t<stdexec::start>, QThreadOperationState& state) noexcept {
-        state.start();
-    }
 private:
-    Q_DISABLE_COPY_MOVE(QThreadOperationState)
+    Q_DISABLE_COPY_MOVE(QThreadOperation)
     Recv receiver_;
     QThread* thread_;
 };
@@ -105,27 +103,30 @@ class QObjectSender {
         }
     };
 
-    friend default_env tag_invoke(stdexec::get_env_t, const QObjectSender& snd) noexcept {
-        return { snd.obj_->thread() };
+    default_env get_env() const noexcept {
+        return { obj_->thread() };
     }
 
 public:
-    using is_sender = void;
-    using m_ptr_type = Ret (QObj::*)(Args...);
+    //using is_sender = void;
+    using sender_concept = stdexec::sender_t;
     using completion_signatures = stdexec::completion_signatures<
                                   stdexec::set_value_t(Args...),
         stdexec::set_error_t(std::exception_ptr)>;
 
+    using m_ptr_type = Ret (QObj::*)(Args...);
+
     QObjectSender(QObj* obj, m_ptr_type ptr) : obj_(obj), m_ptr_(ptr) {}
-    QObj* Object() { return obj_; }
-    m_ptr_type MemberPtr() { return m_ptr_; }
 
-    template<class Recv>
-    friend inline QObjectOperationState<Recv, QObj, Ret, Args...>
-    tag_invoke(stdexec::tag_t<stdexec::connect>, QObjectSender sender, Recv&& receiver) {
-        return QObjectOperationState<Recv, QObj, Ret, Args...>(std::move(receiver), sender.Object(), sender.MemberPtr());
+    //template<class Recv>
+    //friend inline QObjectOperationState<Recv, QObj, Ret, Args...>
+    //tag_invoke(stdexec::tag_t<stdexec::connect>, QObjectSender sender, Recv&& receiver) {
+    //    return QObjectOperationState<Recv, QObj, Ret, Args...>(std::move(receiver), sender.obj_, sender.m_ptr_);
+    //}
+
+    STDEXEC_MEMFN_DECL(auto connect)(this auto sender, stdexec::receiver auto&& receiver) {
+        return QObjectOperationState<decltype(receiver), QObj, Ret, Args...>(std::move(receiver), sender.obj_, sender.m_ptr_);
     }
-
 private:
     QObj* obj_;
     m_ptr_type m_ptr_;
@@ -137,15 +138,16 @@ class QObjectOperationState {
 public:
     using m_ptr_type = Ret (QObj::*)(Args...);
     QObjectOperationState(Recv&& receiver, QObj* obj, m_ptr_type ptr) :
-                                                                        receiver_(receiver),
-                                                                        obj_(obj),
-                                                                        m_ptr_(ptr) {}
+        receiver_(std::move(receiver)),
+        obj_(obj),
+        m_ptr_(ptr) {}
 
-    friend void tag_invoke(stdexec::tag_t<stdexec::start>, QObjectOperationState& state) noexcept {
-        state.connection_ = QObject::connect(state.obj_, state.m_ptr_,
-                                             [&state](Args... args) {
-                                                 stdexec::set_value(std::move(state.receiver_), std::forward<Args>(args)...);
-                                             });
+    //friend void tag_invoke(stdexec::tag_t<stdexec::start>, QObjectOperationState& state) noexcept {
+    void start() noexcept {
+        connection_ = QObject::connect(obj_, m_ptr_,
+            [this](Args... args) {
+                stdexec::set_value(std::move(receiver_), std::forward<Args>(args)...);
+            });
     }
 
     ~QObjectOperationState() {
