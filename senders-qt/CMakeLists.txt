@@ -21,14 +21,14 @@ CPMAddPackage(NAME stdexec
     GIT_TAG main
 )
 
-find_package(QT NAMES Qt6 REQUIRED COMPONENTS Core)
-find_package(Qt6 REQUIRED COMPONENTS Core)
+find_package(QT NAMES Qt6 REQUIRED COMPONENTS Core Network)
+find_package(Qt6 REQUIRED COMPONENTS Core Network)
 
 add_executable(senders-qt
   main.cpp
   qtstdexec.h
 )
-target_link_libraries(senders-qt Qt6::Core STDEXEC::stdexec)
+target_link_libraries(senders-qt Qt6::Core Qt6::Network STDEXEC::stdexec)
 
 include(GNUInstallDirs)
 install(TARGETS senders-qt
