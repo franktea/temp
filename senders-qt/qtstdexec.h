@@ -119,17 +119,17 @@ public:
 
     QObjectSender(QObj* obj, m_ptr_type ptr) : obj_(obj), m_ptr_(ptr) {}
 
-    /*STDEXEC_MEMFN_DECL(auto connect)(this auto sender, stdexec::receiver auto&& receiver) {
-    //auto connect(this auto sender, stdexec::receiver auto&& receiver) {
-        return QObjectOperationState<std::remove_cvref_t<decltype(receiver)>, QObj, Ret, Args...>(std::move(receiver), sender.obj_, sender.m_ptr_);
-    }*/
     template <class Recv>
-    friend inline QObjectOperationState<Recv, QObj, Ret, Args...>
-    tag_invoke(stdexec::tag_t<stdexec::connect>, QObjectSender sender, Recv&& receiver)
+    friend auto
+    tag_invoke(stdexec::tag_t<stdexec::connect>, QObjectSender&& sender, Recv&& receiver)
     {
         return QObjectOperationState<Recv, QObj, Ret, Args...>(std::move(receiver), sender.obj_, sender.m_ptr_);
     }
 
+    /*template <class Self, stdexec::receiver Recv>
+    auto connect(this Self&& sender, Recv&& receiver) {
+        return QObjectOperationState<Recv, QObj, Ret, Args...>(std::move(receiver), sender.obj_, sender.m_ptr_);
+    }*/
 private:
     QObj* obj_;
     m_ptr_type m_ptr_;
@@ -144,7 +144,7 @@ public:
         obj_(obj),
         m_ptr_(ptr) {}
 
-    void start() noexcept {
+    void start() & noexcept {
         connection_ = QObject::connect(obj_, m_ptr_,
             [this](Args... args) {
                 stdexec::set_value(std::move(receiver_), std::forward<Args>(args)...);
