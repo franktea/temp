@@ -12,6 +12,15 @@
 
 using namespace QtSteExec;
 
+QNetworkRequest MakeReqeust(const QNetworkRequest& req,
+    long bytes_transferred, long chunk_size) {
+    QString range_template(QLatin1String("bytes=%1-%2"));
+    QString ranges_header = range_template.arg(bytes_transferred).arg(bytes_transferred + chunk_size - 1);
+    QNetworkRequest ret = req;
+    ret.setRawHeader(QByteArray("Range"), ranges_header.toUtf8());
+    return ret;
+}
+
 exec::task<void> FetchFileLength() {
     std::cout<<"start fetch file...\n";
     QNetworkAccessManager nam;
@@ -19,8 +28,27 @@ exec::task<void> FetchFileLength() {
     QNetworkReply* reply = nam.head(req);
     co_await QObjectAsSender(reply, &QNetworkReply::finished);
     QVariant length = reply->header(QNetworkRequest::ContentLengthHeader);
-    std::cout<<"get file info length = "<< length.value<long>() << "\n";
+    const auto content_length = length.value<long>();
+    std::cout<<"get file info length = "<< content_length << "\n";
     reply->deleteLater();
+
+    long bytes_downloaded = 0;
+    const long chunk_size = 1000000;
+    while(bytes_downloaded < content_length) {
+        req = MakeReqeust(req, bytes_downloaded, chunk_size);
+        QNetworkReply* reply = nam.get(req);
+        qint64 bytes = 0;
+        qint64 total = 0;
+        do {
+            std::tie(bytes, total) = co_await QObjectAsTupleSender(reply, &QNetworkReply::downloadProgress);
+            QVariant l = reply->header(QNetworkRequest::ContentLengthHeader);
+            bytes_downloaded += l.value<long>();
+            std::cout<<"dowloaded " << bytes_downloaded << " of " << content_length << "\n";
+        } while(bytes != total);
+        co_await QObjectAsSender(reply, &QNetworkReply::finished);
+        reply->deleteLater();
+    }
+    std::cout<<"finished downloading file\n";
 }
 
 exec::task<void> AsyncSleep() {
