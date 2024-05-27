@@ -18,6 +18,7 @@ QNetworkRequest MakeReqeust(const QNetworkRequest& req,
     QString ranges_header = range_template.arg(bytes_transferred).arg(bytes_transferred + chunk_size - 1);
     QNetworkRequest ret = req;
     ret.setRawHeader(QByteArray("Range"), ranges_header.toUtf8());
+    std::cout<<ranges_header.toStdString()<<"\n";
     return ret;
 }
 
@@ -41,11 +42,11 @@ exec::task<void> FetchFileLength() {
         qint64 total = 0;
         do {
             std::tie(bytes, total) = co_await QObjectAsTupleSender(reply, &QNetworkReply::downloadProgress);
-            QVariant l = reply->header(QNetworkRequest::ContentLengthHeader);
-            bytes_downloaded += l.value<long>();
-            std::cout<<"dowloaded " << bytes_downloaded << " of " << content_length << "\n";
+            std::cout<<"... bytes = " << bytes << ", total = " << total << "\n";
         } while(bytes != total);
         co_await QObjectAsSender(reply, &QNetworkReply::finished);
+        bytes_downloaded += total;
+        std::cout<<"dowloaded " << bytes_downloaded << " of " << content_length << "\n";
         reply->deleteLater();
     }
     std::cout<<"finished downloading file\n";
