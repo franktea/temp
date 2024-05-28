@@ -22,7 +22,7 @@ QNetworkRequest MakeReqeust(const QNetworkRequest& req,
     return ret;
 }
 
-exec::task<void> FetchFileLength() {
+exec::task<void> DownloadFile() {
     std::cout<<"start fetch file...\n";
     QNetworkAccessManager nam;
     QNetworkRequest req = QNetworkRequest(QUrl(QLatin1String("https://ftp.funet.fi/pub/Linux/kernel/v5.x/linux-5.19.tar.gz")));
@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
     exec::async_scope scope;
     auto t = AsyncSleep();
     scope.spawn(std::move(t));
-    auto l = FetchFileLength();
+    auto l = DownloadFile();
     scope.spawn(std::move(l));
     std::cout<<"start running...\n";
 
