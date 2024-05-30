@@ -10,3 +10,6 @@ rand_bmp/a.out
 rand_bmp/random.bmp
 */a.out
 build-*-Debug
+plugin-pybind11/main
+plugin-pybind11/enc_dec_wrapper.cpython-312-darwin.so
+plugin-pybind11/__pycache__/enc_dec_test.cpython-312.pyc
