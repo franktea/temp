@@ -37,7 +37,7 @@ struct State {
         if(s2.w[i] <= V[j] - s2.w[j]) {
             s2.w[j] += s2.w[i];
             s2.w[i] = 0;
-        } else { // 要么把第i个桶倒空
+        } else { // 要么把第j个桶倒满
             s2.w[i] -= (V[j] - s2.w[j]);
             s2.w[j] = V[j];
         }
