@@ -1,15 +1,11 @@
-
-
-
 #include <queue>
-#include <tuple>
 #include <array>
 #include <set>
 #include <iostream>
 #include <cassert>
-#include <map>
 #include <vector>
 #include <string>
+#include <format> // 用c++23编译，gcc14可以编过
 
 using namespace std;
 
@@ -28,11 +24,6 @@ struct State {
     State Pour(int i, int j) const {
         assert(CanPour(i, j));
         State s2 = *this;
-        string str;
-        str.push_back(names[i]);
-        str.append("->");
-        str.push_back(names[j]);
-        str.append(":");
         // 要么把第i个桶倒空
         if(s2.w[i] <= V[j] - s2.w[j]) {
             s2.w[j] += s2.w[i];
@@ -41,9 +32,7 @@ struct State {
             s2.w[i] -= (V[j] - s2.w[j]);
             s2.w[j] = V[j];
         }
-        str += std::to_string(s2.w[0]) + std::string(", ") +
-            std::to_string(s2.w[1]) + std::string(", ") +
-            std::to_string(s2.w[2]);
+        auto str = std::format("{}->{}: {}, {}, {}", names[i], names[j], s2.w[0], s2.w[1], s2.w[2]);
         s2.steps.push_back(str);
         return s2;
     }
