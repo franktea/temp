@@ -5,13 +5,11 @@
 #include <vector>
 #include <string>
 #include <algorithm>
-#include <cctype>
 #include <stdexcept>
 #include <cctype>
-#include <sstream>
 #include <iterator>
-#include <cassert>
-#include <iomanip>
+#include <cctype>
+#include <memory>
 
 namespace chrono = std::chrono;
 namespace rgs = std::ranges;
@@ -25,10 +23,11 @@ using namespace std::chrono_literals;
 auto dates(unsigned start_year, unsigned stop_year) {
     const auto start = sys_days{chrono::year{static_cast<int>(start_year)}/1/1};
     const auto stop = sys_days{chrono::year{static_cast<int>(stop_year)}/1/1};
-    return vws::iota(0LL, static_cast<long long>((stop - start).count()))
+    auto days_count = (stop - start).count();
+    return vws::iota(0LL, days_count)
         | vws::transform([start](long long n) {
-              return start + days{n};
-          });
+            return start + days{n};
+        });
 }
 
 // 按月份分组
@@ -51,29 +50,29 @@ auto by_week() {
 }
 
 // 日期格式化（例如："  1"）
-std::string format_day(sys_days d) {
-    auto ymd = chrono::year_month_day(d);
-    return std::format("{:>3}", static_cast<unsigned>(ymd.day()));
+auto format_day() {
+    return vws::transform([](sys_days d) {
+        auto ymd = chrono::year_month_day(d);
+        return std::format("{:>3}", static_cast<unsigned>(ymd.day()));
+    });
 }
 
 // 周格式化（前置空格 + 日期）
-std::string format_week(const auto& week_range) {
-    // 创建一个向量来存储日期
-    std::vector<sys_days> week;
-    for (auto&& day : week_range) {
-        week.push_back(day);
-    }
-    
-    if (week.empty()) return "";
-    
-    auto first_day = week.front();
-    auto wd = chrono::weekday(first_day);
-    int spaces = (wd.c_encoding() - chrono::Sunday.c_encoding() + 7) % 7 * 3;
-    std::string day_str;
-    for (auto day : week) {
-        day_str += format_day(day);
-    }
-    return std::format("{:<{}}{}", "", spaces, day_str);
+auto format_week() {
+    return vws::transform([](auto&& week_range) {
+        // 获取第一天的星期几
+        auto first_day = *rgs::begin(week_range);
+        auto wd = chrono::weekday(first_day);
+        int spaces = (wd.c_encoding() - chrono::Sunday.c_encoding() + 7) % 7 * 3;
+        
+        // 格式化为字符串
+        std::string week_str;
+        for (auto&& day : week_range) {
+            week_str += std::format("{:>3}", static_cast<unsigned>(chrono::year_month_day(day).day()));
+        }
+        
+        return std::format("{:<{}}{}", "", spaces, week_str);
+    });
 }
 
 // 月份标题居中
@@ -82,74 +81,85 @@ constexpr std::string_view month_names[] = {
     "July", "August", "September", "October", "November", "December"
 };
 
-std::string month_title(sys_days d) {
-    auto ymd = chrono::year_month_day(d);
-    auto month_idx = static_cast<unsigned>(ymd.month()) - 1;
-    return std::format("{:^22}", month_names[month_idx]);
+auto month_title() {
+    return vws::transform([](auto&& month_range) {
+        auto first_day = *rgs::begin(month_range);
+        auto ymd = chrono::year_month_day(first_day);
+        auto month_idx = static_cast<unsigned>(ymd.month()) - 1;
+        return std::format("{:^22}", month_names[month_idx]);
+    });
 }
 
 // 布局单个月份（标题 + 最多6周）
-auto layout_month(const auto& month_range) {
-    std::vector<std::string> lines;
-    if (rgs::empty(month_range)) return lines;
-    
-    // 创建月份的日期向量
-    std::vector<sys_days> month;
-    for (auto&& day : month_range) {
-        month.push_back(day);
-    }
-    
-    lines.push_back(month_title(month.front())); // 标题行
-    
-    // 按周分组并格式化
-    auto weeks = month | by_week();
-    for (auto&& week : weeks) {
-        lines.push_back(format_week(week));
-    }
-    
-    // 补足6行（标题+最多5周数据）
-    lines.resize(7, std::string(22, ' ')); 
-    return lines;
+auto layout_month() {
+    return vws::transform([](auto&& month_range) {
+        // 收集周数据
+        auto weeks = month_range | by_week() | format_week();
+        std::vector<std::string> weeks_vec;
+        for (auto&& week : weeks) {
+            weeks_vec.push_back(week);
+        }
+        size_t week_count = weeks_vec.size();
+        
+        // 标题行
+        auto title = month_title()(vws::single(month_range));
+        std::string title_str;
+        for (auto&& t : title) {
+            title_str = t;
+            break; // 只有一个元素
+        }
+        
+        // 构建月份行：标题 + 周数据 + 空行（补足到6行）
+        std::vector<std::string> lines;
+        lines.push_back(title_str);
+        for (size_t i = 0; i < std::min(week_count, size_t(6)); ++i) {
+            lines.push_back(weeks_vec[i]);
+        }
+        for (size_t i = week_count; i < 6; ++i) {
+            lines.push_back(std::string(22, ' '));
+        }
+        return lines;
+    });
 }
 
-// 格式日历函数（替代视图管道）
-template <typename MonthsRange>
-std::vector<std::string> format_calendar(MonthsRange&& months_range, size_t months_per_line) {
-    std::vector<std::string> result;
-    std::vector<std::vector<std::string>> month_lines;
-    
-    // 为每个月份生成行
-    for (auto&& month : months_range) {
-        month_lines.push_back(layout_month(month));
-    }
-    
-    if (month_lines.empty()) return result;
-    
-    // 分组成多行排列
-    for (size_t i = 0; i < month_lines.size(); i += months_per_line) {
-        // 获取当前行的月份组
-        size_t end_idx = std::min(i + months_per_line, month_lines.size());
+// 转置月份组（行转列）
+auto transpose_months() {
+    return vws::transform([](auto&& months_group) {
+        // 收集所有月份的行
+        std::vector<std::vector<std::string>> all_lines;
+        for (auto&& month : months_group) {
+            all_lines.push_back(month); // month 是一个 vector<string>
+        }
         
-        // 构建7行（标题+周数据）
-        for (size_t line = 0; line < 7; line++) {
-            std::string merged_line;
-            for (size_t col = i; col < end_idx; col++) {
-                if (line < month_lines[col].size()) {
-                    merged_line += month_lines[col][line] + "  ";
+        // 转置：将每个月份的第i行取出来组成新行
+        std::vector<std::string> transposed;
+        for (size_t i = 0; i < 7; i++) { // 7行：标题+最多6周
+            std::string line;
+            for (size_t j = 0; j < all_lines.size(); j++) {
+                if (i < all_lines[j].size()) {
+                    line += all_lines[j][i] + "  ";
                 } else {
-                    merged_line += std::string(22, ' ') + "  ";
+                    line += std::string(22, ' ') + "  ";
                 }
             }
-            result.push_back(merged_line);
+            transposed.push_back(line);
         }
-        
-        // 添加空行分隔月份组
-        if (end_idx < month_lines.size()) {
-            result.push_back("");
-        }
-    }
-    
-    return result;
+        return transposed;
+    });
+}
+
+// 连接月份行
+auto join_months() {
+    return vws::join;
+}
+
+// 核心日历格式化管道
+auto format_calendar(size_t months_per_line) {
+    return by_month()
+        | layout_month()
+        | vws::chunk(months_per_line)
+        | transpose_months()
+        | join_months();
 }
 
 // 参数解析
@@ -168,11 +178,7 @@ Config parse_args(int argc, char** argv) {
     cfg.start = std::stoul(argv[1]);
     
     if (argc > 2) {
-        if (std::string(argv[2]) == "never") {
-            cfg.stop = 0; // 标记为无限模式
-        } else {
-            cfg.stop = std::stoul(argv[2]);
-        }
+        cfg.stop = std::stoul(argv[2]);
     } else {
         cfg.stop = cfg.start + 1; // 默认只显示一年
     }
@@ -185,62 +191,31 @@ Config parse_args(int argc, char** argv) {
     }
     
     // 验证参数
-    if (cfg.stop != 0 && cfg.stop <= cfg.start) {
+    if (cfg.stop <= cfg.start) {
         throw std::runtime_error("Stop year must be greater than start year");
     }
     
     return cfg;
 }
 
-int main(int argc, char** argv) try {
-    Config cfg;
+int main(int argc, char** argv) {
     try {
-        cfg = parse_args(argc, argv);
+        auto cfg = parse_args(argc, argv);
+        
+        // 生成日期序列
+        auto date_range = dates(cfg.start, cfg.stop);
+        
+        // 生成并输出日历
+        auto calendar_lines = date_range | format_calendar(cfg.per_line);
+        
+        for (const auto& line : calendar_lines) {
+            std::cout << line << '\n';
+        }
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << '\n';
         std::cerr << "Usage: " << argv[0] 
-                  << " <start_year> [stop_year|never] [months_per_line=3]\n";
+                  << " <start_year> <stop_year> [months_per_line=3]\n";
         return 1;
     }
-    
-    try {
-        if (cfg.stop == 0) { // 无限模式
-            // 设置一个合理的截止年份
-            const unsigned end_year = cfg.start + 10;
-            
-            // 生成日期序列
-            auto date_range = dates(cfg.start, end_year);
-            
-            // 按月份分组
-            auto months = date_range | by_month();
-            
-            // 格式化为日历行
-            auto calendar_lines = format_calendar(months, cfg.per_line);
-            
-            // 输出结果
-            for (const auto& line : calendar_lines) {
-                std::cout << line << '\n';
-            }
-        } else {
-            // 生成日期序列
-            auto date_range = dates(cfg.start, cfg.stop);
-            
-            // 按月份分组
-            auto months = date_range | by_month();
-            
-            // 格式化为日历行
-            auto calendar_lines = format_calendar(months, cfg.per_line);
-            
-            // 输出结果
-            for (const auto& line : calendar_lines) {
-                std::cout << line << '\n';
-            }
-        }
-    } catch (const std::exception& e) {
-        std::cerr << "Calendar generation error: " << e.what() << '\n';
-        return 1;
-    }
-} catch (const std::exception& e) {
-    std::cerr << "Fatal error: " << e.what() << '\n';
-    return 1;
+    return 0;
 }
