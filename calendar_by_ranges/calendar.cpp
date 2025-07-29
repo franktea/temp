@@ -1,221 +1,372 @@
+/**
+ * @file calendar.cpp
+ * @author frankt
+ * @brief 
+ * @version 0.1
+ * @date 2025-07-26
+ * 
+ * refractoring calendar example from Eric Niebler's range-v3,
+ * using std::ranges in C++26.
+ * compile with: g++15 -std=c++20 calendar.cpp -o calendar
+ * 
+ */
+
+#include <algorithm>
+#include <cstddef>
+#include <functional>
+#include <iostream>
+#include <iterator>
+#include <list>
+#include <ranges>
+#include <stdexcept>
+#include <string>
+#include <vector>
 #include <chrono>
 #include <format>
-#include <iostream>
-#include <ranges>
-#include <vector>
-#include <string>
-#include <algorithm>
-#include <stdexcept>
-#include <cctype>
-#include <iterator>
 #include <cctype>
 #include <memory>
 
+namespace views = std::ranges::views;
 namespace chrono = std::chrono;
-namespace rgs = std::ranges;
-namespace vws = std::views;
-
-using sys_days = chrono::sys_days;
-using days = chrono::days;
 using namespace std::chrono_literals;
+using namespace std::string_literals;
 
-// 生成日期序列（从start_year年1月1日到stop_year年1月1日前一天）
-auto dates(unsigned start_year, unsigned stop_year) {
-    const auto start = sys_days{chrono::year{static_cast<int>(start_year)}/1/1};
-    const auto stop = sys_days{chrono::year{static_cast<int>(stop_year)}/1/1};
-    auto days_count = (stop - start).count();
-    return vws::iota(0LL, days_count)
-        | vws::transform([start](long long n) {
-            return start + days{n};
+using date = chrono::sys_days;
+using day_t = chrono::days;
+
+// Custom interleave_view with shared_ptr for data lifetime
+namespace my_views {
+    template <typename Rngs>
+    requires std::ranges::forward_range<Rngs> &&
+             std::ranges::forward_range<std::ranges::range_value_t<Rngs>>
+    class interleave_view : public std::ranges::view_interface<interleave_view<Rngs>> {
+    private:
+        std::shared_ptr<std::vector<std::ranges::range_value_t<Rngs>>> data_ptr_;
+        friend class iterator;
+    public:
+        interleave_view() = default;
+        
+        template <typename T>
+        explicit interleave_view(T&& rngs)
+            : data_ptr_(std::make_shared<std::vector<std::ranges::range_value_t<Rngs>>>(
+                  rngs | std::ranges::to<std::vector>()))
+        {}
+
+        class iterator {
+        public:
+            // 关键：正确定义 value_type
+            using value_type = std::ranges::range_value_t<std::ranges::range_value_t<Rngs>>;
+            using difference_type = std::ptrdiff_t;
+            using iterator_category = std::forward_iterator_tag;
+
+        private:
+            std::size_t n_ = 0;
+            std::vector<std::ranges::iterator_t<std::ranges::range_value_t<Rngs>>> iters_;
+            std::vector<std::ranges::sentinel_t<std::ranges::range_value_t<Rngs>>> ends_;
+            
+        public:
+            iterator() = default;
+            
+            explicit iterator(interleave_view& parent)
+            {
+                for (auto&& inner_rng : *parent.data_ptr_) {
+                    iters_.push_back(std::ranges::begin(inner_rng));
+                    ends_.push_back(std::ranges::end(inner_rng));
+                }
+
+                // 用这个就知道value_type是啥类型了
+                static_assert(std::is_same_v<value_type, std::string>, "value_type must be copyable or movable");
+            }
+
+            value_type operator*() const {
+                return *iters_[n_];
+            }
+
+            iterator& operator++() {
+                n_ = (n_ + 1) % iters_.size();
+                if (n_ == 0) {
+                    for (auto& it : iters_) {
+                        ++it;
+                    }
+                }
+                return *this;
+            }
+
+            iterator operator++(int) {
+                auto tmp = *this;
+                ++*this;
+                return tmp;
+            }
+
+            bool operator==(const iterator&) const = default;
+
+            bool operator==(std::default_sentinel_t) const {
+                return iters_.empty() || iters_[0] == ends_[0];
+            }
+        };
+        
+        iterator begin() {
+            return iterator{*this};
+        }
+        
+        std::default_sentinel_t end() const noexcept {
+            return {};
+        }
+    };
+
+    template <typename Rngs>
+    interleave_view(Rngs) -> interleave_view<Rngs>;
+
+    struct interleave_adaptor : std::ranges::range_adaptor_closure<interleave_adaptor> {
+        template <std::ranges::viewable_range Rng>
+        requires std::ranges::forward_range<std::ranges::range_value_t<Rng>>
+        auto operator()(Rng&& rng) const {
+            return interleave_view{std::forward<Rng>(rng)};
+        }
+    };
+} // namespace my_views
+
+inline constexpr my_views::interleave_adaptor interleave;
+
+// 日期迭代器，使 sys_days 可以用于 ranges
+struct date_iterator {
+    using iterator_category = std::forward_iterator_tag;
+    using difference_type = std::ptrdiff_t;
+    using value_type = date;
+    using reference = const date&;
+    using pointer = const date*;
+
+    date current;
+
+    date_iterator() = default;
+    explicit date_iterator(date d) : current(d) {}
+    
+    date operator*() const { return current; }
+    date operator->() { return current; }
+    
+    date_iterator& operator++() {
+        current += day_t{1};
+        return *this;
+    }
+    
+    date_iterator operator++(int) {
+        date_iterator tmp = *this;
+        ++(*this);
+        return tmp;
+    }
+    
+    bool operator==(const date_iterator& rhs) const = default;
+};
+
+// 创建日期范围视图
+class dates_view : public std::ranges::view_interface<dates_view> {
+    date from_;
+    date to_;
+    
+public:
+    dates_view() = default;
+    dates_view(date from, date to) : from_(from), to_(to) {}
+    
+    auto begin() const { return date_iterator(from_); }
+    auto end() const { return date_iterator(to_); }
+    
+    std::size_t size() const {
+        return (to_ - from_).count();
+    }
+};
+
+// In: start year, stop year
+// Out: range of dates from start to stop
+auto dates(unsigned short start, unsigned short stop) {
+    auto d_start = chrono::sys_days{chrono::year{start}/1/1};
+    auto d_stop = chrono::sys_days{chrono::year{stop}/1/1};
+    
+    return dates_view(d_start, d_stop);
+}
+static_assert(std::ranges::forward_range<decltype(dates(2023,2024))>);
+
+// 从指定年份开始的无界日期范围
+class dates_from_view : public std::ranges::view_interface<dates_from_view> {
+    date from_;
+    
+public:
+    dates_from_view() = default;
+    explicit dates_from_view(date from) : from_(from) {}
+    
+    auto begin() const { return date_iterator(from_); }
+    auto end() const { return std::unreachable_sentinel; }
+};
+
+// In: year
+// Out: infinite range of dates from that year
+auto dates_from(unsigned short year) {
+    auto d_start = chrono::sys_days{chrono::year{year}/1/1};
+    return dates_from_view(d_start);
+}
+static_assert(std::ranges::forward_range<decltype(dates_from(2023))>);
+
+// In:  range of dates
+// Out: range of ranges grouped by month
+auto by_month() {
+    return views::chunk_by(
+        [](date a, date b) { 
+            auto a_ym = chrono::year_month_day{a}.year()/chrono::year_month_day{a}.month();
+            auto b_ym = chrono::year_month_day{b}.year()/chrono::year_month_day{b}.month();
+            return a_ym == b_ym;
         });
 }
 
-// 按月份分组
-auto by_month() {
-    return vws::chunk_by([](sys_days d1, sys_days d2) {
-        auto ymd1 = chrono::year_month_day(d1);
-        auto ymd2 = chrono::year_month_day(d2);
-        return ymd1.month() == ymd2.month() && ymd1.year() == ymd2.year();
-    });
-}
-
-// 按周分组（周日到周六为一周）
+// In:  range of dates
+// Out: range of ranges grouped by ISO week
 auto by_week() {
-    return vws::chunk_by([](sys_days d1, sys_days d2) {
-        // 计算两个日期所在的周日
-        auto sunday1 = d1 - (chrono::weekday(d1) - chrono::Sunday);
-        auto sunday2 = d2 - (chrono::weekday(d2) - chrono::Sunday);
-        return sunday1 == sunday2;
+    return views::chunk_by([](date a, date b) {
+        return (b - a).count() == 1 && 
+               chrono::weekday{a}.c_encoding() != 6;
     });
 }
 
-// 日期格式化（例如："  1"）
-auto format_day() {
-    return vws::transform([](sys_days d) {
-        auto ymd = chrono::year_month_day(d);
-        return std::format("{:>3}", static_cast<unsigned>(ymd.day()));
-    });
+// In:  date object
+// Out: formatted day string (right-aligned)
+std::string format_day(date d) {
+    unsigned day_val = static_cast<unsigned>(chrono::year_month_day{d}.day());
+    return std::format("{:>3}", day_val);
 }
 
-// 周格式化（前置空格 + 日期）
-auto format_week() {
-    return vws::transform([](auto&& week_range) {
-        // 获取第一天的星期几
-        auto first_day = *rgs::begin(week_range);
-        auto wd = chrono::weekday(first_day);
-        int spaces = (wd.c_encoding() - chrono::Sunday.c_encoding() + 7) % 7 * 3;
-        
-        // 格式化为字符串
-        std::string week_str;
-        for (auto&& day : week_range) {
-            week_str += std::format("{:>3}", static_cast<unsigned>(chrono::year_month_day(day).day()));
+// In:  range<range<date>> (weeks)
+// Out: range<string> formatted weeks
+auto format_weeks() {
+    return views::transform([](auto&& week) {
+        if (std::ranges::empty(week)) {
+            return std::string(21, ' ');
         }
         
-        return std::format("{:<{}}{}", "", spaces, week_str);
+        auto first_day = *std::ranges::begin(week);
+        chrono::weekday wd{first_day};
+        
+        // 计算前导空格数量（以周日为0）
+        int leading_spaces = 3 * wd.c_encoding();
+        std::string leading_space_str(leading_spaces, ' ');
+        
+        // 格式化日期部分
+        std::string days_str = week | views::transform(format_day) | views::join | std::ranges::to<std::string>();
+        
+        return std::format("{:<22}", leading_space_str + days_str);
     });
 }
 
-// 月份标题居中
-constexpr std::string_view month_names[] = {
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
+// In:  date
+// Out: month title string (centered)
+std::string month_title(date d) {
+    auto ymd = chrono::year_month_day{d};
+    auto month_name = std::format("{:%B}", ymd);
+    return std::format("{:^22}", month_name);
+}
+
+// In:  range<range<date>> (months)
+// Out: range<range<string>> formatted months
+auto layout_months() {
+    return views::transform([](auto&& month) {
+        auto week_count = std::ranges::distance(month | by_week());
+        return views::concat(
+            views::single(month_title(*std::ranges::begin(month))),
+            month | by_week() | format_weeks(),
+            views::repeat(std::string(22, ' '), 6 - week_count)
+        );
+    });
+}
+
+// 修改 transpose_closure 实现
+struct transpose_closure : std::ranges::range_adaptor_closure<transpose_closure> {
+    template <std::ranges::viewable_range Rng>
+    requires std::ranges::forward_range<Rng>
+    auto operator()(Rng&& rngs) const {
+        // 计算输入范围的大小
+        auto size = std::ranges::distance(rngs);
+        
+        // 直接构造 interleave_view
+        auto interleaved = my_views::interleave_view{std::forward<Rng>(rngs)};
+        
+        // 使用双参数版本的 chunk
+        return std::ranges::views::chunk(interleaved, size);
+    }
 };
 
-auto month_title() {
-    return vws::transform([](auto&& month_range) {
-        auto first_day = *rgs::begin(month_range);
-        auto ymd = chrono::year_month_day(first_day);
-        auto month_idx = static_cast<unsigned>(ymd.month()) - 1;
-        return std::format("{:^22}", month_names[month_idx]);
-    });
-}
+inline constexpr transpose_closure transpose;
 
-// 布局单个月份（标题 + 最多6周）
-auto layout_month() {
-    return vws::transform([](auto&& month_range) {
-        // 收集周数据
-        auto weeks = month_range | by_week() | format_week();
-        std::vector<std::string> weeks_vec;
-        for (auto&& week : weeks) {
-            weeks_vec.push_back(week);
-        }
-        size_t week_count = weeks_vec.size();
-        
-        // 标题行
-        auto title = month_title()(vws::single(month_range));
-        std::string title_str;
-        for (auto&& t : title) {
-            title_str = t;
-            break; // 只有一个元素
-        }
-        
-        // 构建月份行：标题 + 周数据 + 空行（补足到6行）
-        std::vector<std::string> lines;
-        lines.push_back(title_str);
-        for (size_t i = 0; i < std::min(week_count, size_t(6)); ++i) {
-            lines.push_back(weeks_vec[i]);
-        }
-        for (size_t i = week_count; i < 6; ++i) {
-            lines.push_back(std::string(22, ' '));
-        }
-        return lines;
-    });
-}
-
-// 转置月份组（行转列）
+// 修改 transpose_months 函数
 auto transpose_months() {
-    return vws::transform([](auto&& months_group) {
-        // 收集所有月份的行
-        std::vector<std::vector<std::string>> all_lines;
-        for (auto&& month : months_group) {
-            all_lines.push_back(month); // month 是一个 vector<string>
-        }
-        
-        // 转置：将每个月份的第i行取出来组成新行
-        std::vector<std::string> transposed;
-        for (size_t i = 0; i < 7; i++) { // 7行：标题+最多6周
-            std::string line;
-            for (size_t j = 0; j < all_lines.size(); j++) {
-                if (i < all_lines[j].size()) {
-                    line += all_lines[j][i] + "  ";
-                } else {
-                    line += std::string(22, ' ') + "  ";
-                }
-            }
-            transposed.push_back(line);
-        }
-        return transposed;
+    return views::transform(
+        [](auto rng) { return rng | transpose; });
+}
+
+// In:  range<range<string>>
+// Out: range<string> joined months
+auto join_months() {
+    return views::transform([](auto rng) {
+        return rng | views::join | std::ranges::to<std::string>();
     });
 }
 
-// 连接月份行
-auto join_months() {
-    return vws::join;
+// In:  range<date>
+// Out: range<string> formatted lines
+auto format_calendar(std::size_t months_per_line)
+{
+    return
+        // Group the dates by month:
+        by_month()
+        // Format the month into a range of strings:
+      | layout_months()
+        // Group the months that belong side-by-side:
+      | views::chunk(months_per_line)
+        // Transpose the rows and columns of the size-by-side months:
+      | transpose_months()
+        // Ungroup the side-by-side months:
+      | views::join
+        // Join the strings of the transposed months:
+      | join_months();
 }
 
-// 核心日历格式化管道
-auto format_calendar(size_t months_per_line) {
-    return by_month()
-        | layout_month()
-        | vws::chunk(months_per_line)
-        | transpose_months()
-        | join_months();
-}
-
-// 参数解析
-struct Config {
-    unsigned start = 0;
-    unsigned stop = 0;
-    size_t per_line = 3;
-};
-
-Config parse_args(int argc, char** argv) {
-    Config cfg;
+int main(int argc, char *argv[]) try {
     if (argc < 2) {
-        throw std::runtime_error("Missing required argument: start year");
-    }
-    
-    cfg.start = std::stoul(argv[1]);
-    
-    if (argc > 2) {
-        cfg.stop = std::stoul(argv[2]);
-    } else {
-        cfg.stop = cfg.start + 1; // 默认只显示一年
-    }
-    
-    if (argc > 3) {
-        cfg.per_line = std::stoul(argv[3]);
-        if (cfg.per_line < 1 || cfg.per_line > 6) {
-            throw std::runtime_error("Months per line must be between 1 and 6");
-        }
-    }
-    
-    // 验证参数
-    if (cfg.stop <= cfg.start) {
-        throw std::runtime_error("Stop year must be greater than start year");
-    }
-    
-    return cfg;
-}
-
-int main(int argc, char** argv) {
-    try {
-        auto cfg = parse_args(argc, argv);
-        
-        // 生成日期序列
-        auto date_range = dates(cfg.start, cfg.stop);
-        
-        // 生成并输出日历
-        auto calendar_lines = date_range | format_calendar(cfg.per_line);
-        
-        for (const auto& line : calendar_lines) {
-            std::cout << line << '\n';
-        }
-    } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << '\n';
-        std::cerr << "Usage: " << argv[0] 
-                  << " <start_year> <stop_year> [months_per_line=3]\n";
+        std::cerr << "Usage: " << argv[0] << " start [stop] [--per-line N]\n";
         return 1;
     }
-    return 0;
+    
+    // Parse arguments
+    unsigned short start = std::stoi(argv[1]);
+    unsigned short stop = start + 1;
+    std::size_t months_per_line = 3;
+    bool never_stop = false;
+    
+    for (int i = 2; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "never") {
+            never_stop = true;
+        } else if (arg == "--per-line") {
+            if (++i < argc) months_per_line = std::stoul(argv[i]);
+        } else if (std::isdigit(arg[0])) {
+            stop = std::stoi(arg);
+        }
+    }
+    
+    if (stop <= start) {
+        std::cerr << "ERROR: stop year must be > start year\n";
+        return 1;
+    }
+    
+    // Generate and print calendar
+    if (never_stop) {
+        auto cal = dates_from(start) | format_calendar(months_per_line);
+        for (auto&& line : cal | views::take(100)) { // Prevent infinite output
+            std::cout << line << '\n';
+        }
+    } else {
+        for (auto&& line : dates(start, stop) | format_calendar(months_per_line)) {
+            std::cout << line << '\n';
+        }
+    }
+}
+catch(std::exception &e) {
+    std::cerr << "ERROR: " << e.what() << "\n";
+    return 1;
 }
