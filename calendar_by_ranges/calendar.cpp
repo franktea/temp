@@ -7,7 +7,7 @@
  * 
  * refractoring calendar example from Eric Niebler's range-v3,
  * using std::ranges in C++26.
- * compile with: g++15 -std=c++20 calendar.cpp -o calendar
+ * compile with: g++15 -std=c++26 calendar.cpp -o calendar
  * 
  */
 
