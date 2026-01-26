@@ -37,7 +37,7 @@ class Derived3 : public Derived2 {
 };
 
 // Non‑virtual equivalent with three inline functions
-class NonVirtualThree {
+class PODClass {
  public:
   int64_t f1(int64_t x) const { return x * 2 + 1; }
   int64_t f2(int64_t x) const { return x * 3 + 2; }
@@ -65,7 +65,7 @@ BENCHMARK(BM_VirtualSingle);
 // Benchmark: single non‑virtual call (inline)
 // ----------------------------------------------------------------------------
 static void BM_NonVirtualSingle(benchmark::State& state) {
-  NonVirtualThree obj;
+  PODClass obj;
   int64_t sum = 0;
   for (auto _ : state) {
     benchmark::DoNotOptimize(sum += obj.f1(state.iterations()));
@@ -95,7 +95,7 @@ BENCHMARK(BM_VirtualThree);
 // Benchmark: three non‑virtual calls (inline)
 // ----------------------------------------------------------------------------
 static void BM_NonVirtualThree(benchmark::State& state) {
-  NonVirtualThree obj;
+  PODClass obj;
   int64_t sum = 0;
   for (auto _ : state) {
     benchmark::DoNotOptimize(sum += obj.f1(state.iterations()));
@@ -107,44 +107,10 @@ static void BM_NonVirtualThree(benchmark::State& state) {
 BENCHMARK(BM_NonVirtualThree);
 
 // ----------------------------------------------------------------------------
-// Benchmark: polymorphic virtual calls across three derived types
-// ----------------------------------------------------------------------------
-static void BM_VirtualPolymorphic(benchmark::State& state) {
-  Derived1 d1;
-  Derived2 d2;
-  Derived3 d3;
-  const Base* ptrs[] = {&d1, &d2, &d3};
-  const size_t n = sizeof(ptrs) / sizeof(ptrs[0]);
-  int64_t sum = 0;
-  for (auto _ : state) {
-    size_t idx = state.iterations() % n;
-    benchmark::DoNotOptimize(sum += ptrs[idx]->f1(state.iterations()));
-  }
-  global_sink = sum;
-}
-BENCHMARK(BM_VirtualPolymorphic);
-
-// ----------------------------------------------------------------------------
-// Benchmark: virtual calls through three‑level inheritance chain
-// (call f1 on Derived3 through Base*, but with intermediate vtables)
-// ----------------------------------------------------------------------------
-static void BM_VirtualThreeLevel(benchmark::State& state) {
-  Derived3 obj;
-  const Base* ptr = &obj;
-  int64_t sum = 0;
-  for (auto _ : state) {
-    // This traverses three vtables (Base, Derived1, Derived2) to reach Derived3's f1
-    benchmark::DoNotOptimize(sum += ptr->f1(state.iterations()));
-  }
-  global_sink = sum;
-}
-BENCHMARK(BM_VirtualThreeLevel);
-
-// ----------------------------------------------------------------------------
 // Benchmark: non‑virtual calls in a loop (baseline)
 // ----------------------------------------------------------------------------
 static void BM_NonVirtualLoop(benchmark::State& state) {
-  NonVirtualThree objs[8];
+  PODClass objs[8];
   int64_t sum = 0;
   for (auto _ : state) {
     for (size_t i = 0; i < 8; ++i) {
